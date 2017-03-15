@@ -140,6 +140,47 @@ class MetasploitModule < Msf::Auxiliary
     result
   end
 
+  # Sends a raw CAN packet and waits for a response or a timeout
+  # bus = string
+  # srcid = hex id of the sent packet
+  # dstid = hex id of the return packets
+  # data = string of hex bytes to send
+  # timeout = optional int to timeout on lack of response
+  # maxpkts = max number of packets to recieve
+  def cansend_and_wait(bus, srcid, dstid, data, timeout=2000, maxpkts=3)
+    result = {}
+    result["Success"] = false
+    srcid = srcid.to_i(16).to_s(16)
+    dstid = dstid.to_i(16).to_s(16)
+    bytes = data.scan(/../)
+    if bytes.size > 8
+      print_error("Data section currently has to be 8 or less bytes")
+      return result
+    else
+      bytes = bytes.join
+    end
+    # Should we ever require isotpsend for this?
+    `which cansend`
+    if not $?.success?
+      print_error("cansend from can-utils not found in path")
+      return result
+    end
+    @can_interfaces.each do |can|
+      if can == bus
+        candump(bus,dstid,timeout,maxpkts)
+        system("cansend #{bus} #{srcid}##{bytes}")
+        result["Success"] = true if $?.success?
+        result["Packets"] = []
+        $candump_sniffer.join
+        if not @pkt_response.empty?
+          result = @pkt_response
+        end
+      end
+    end
+    result
+
+  end
+
   # Converts candump output to {Packets => [{ ID=> id DATA => [] }]}
   def candump2hash(str_packets)
     hash = {}
@@ -164,7 +205,7 @@ class MetasploitModule < Msf::Auxiliary
     end
   end
 
-  # Sends an ISO-TP style CAN packet and waites for a response or a timeout
+  # Sends an ISO-TP style CAN packet and waits for a response or a timeout
   # bus = string
   # srcid = hex id of the sent packet
   # dstid = hex id of the return packets
@@ -246,6 +287,14 @@ class MetasploitModule < Msf::Auxiliary
       elsif request.uri =~/automotive\/(\w+)\/cansend\?id=(\w+)&data=(\w+)/
         print_status("Request to send CAN packets for #{$1} => #{$2}##{$3}")
         send_response_html(cli, cansend($1, $2, $3).to_json(), { 'Content-Type' => 'application/json' })
+      elsif request.uri =~/automotive\/(\w+)\/cansend_and_wait\?srcid=(\w+)&dstid=(\w+)&data=(\w+)/
+        bus = $1; srcid = $2; dstid = $3; data = $4
+        print_status("Request to send CAN packet and wait for response  #{srcid}##{data} => #{dstid}")
+        timeout = 1500
+        maxpkts = 3
+        timeout = $1 if request.uri=~/&timeout=(\d+)/
+        maxpkts = $1 if request.uri=~/&maxpkts=(\d+)/
+        send_response_html(cli, cansend_and_wait(bus, srcid, dstid, data, timeout, maxpkts).to_json(),  { 'Content-Type' => 'application/json' })
       elsif request.uri =~/automotive\/(\w+)\/isotpsend_and_wait\?srcid=(\w+)&dstid=(\w+)&data=(\w+)/
         bus = $1; srcid = $2; dstid = $3; data = $4
         print_status("Request to send ISO-TP packet and wait for response  #{srcid}##{data} => #{dstid}")

@@ -103,6 +103,18 @@ class Automotive < Extension
     client.send_request("/automotive/#{bus}/cansend?id=#{id}&data=#{data}")
   end
 
+  def cansend_and_wait_for_response(bus, srcId, dstId, data, opt={})
+    data = [ data ] if data.is_a? Integer
+    if data.size <= 8
+      data = array2hex(data).join
+      request_str = "/automotive/#{bus}/cansend_and_wait?srcid=#{srcId}&dstid=#{dstId}&data=#{data}"
+      request_str += "&timeout=#{opt["TIMEOUT"]}" if opt.has_key? "TIMEOUT"
+      request_str += "&maxpkts=#{opt["MAXPKTS"]}" if opt.has_key? "MAXPKTS"
+      return check_for_errors(client.send_request(request_str))
+    end
+    return nil
+  end
+
   def send_isotp_and_wait_for_response(bus, srcId, dstId, data, opt={})
     # TODO Implement sending ISO-TP > 8 bytes
     data = [ data ] if data.is_a? Integer
