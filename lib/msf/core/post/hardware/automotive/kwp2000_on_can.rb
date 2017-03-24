@@ -4,8 +4,9 @@ class Post
 module Hardware
 module Automotive
 
-module KWP2000
+module KWP2000onCAN
 
+# KWP2000 on CAN
 # based on information of the T7Suite for Saab Trionic 7 ECUs (https://github.com/mattiasclaesson/T7Suite/)
 
 # service ID codes
