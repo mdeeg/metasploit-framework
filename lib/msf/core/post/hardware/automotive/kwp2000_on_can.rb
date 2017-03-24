@@ -175,7 +175,7 @@ def send_kwp2000_request(bus, srcId, dstId, target, serviceId, data, opt={})
     if data[3].hex == NEGATIVE_RESPONSE
       print_error("Received negative KWP2000 response")
       print_error("#{data}")
-      return {}
+      return data
     elsif (data[3].hex & ~0x40) == serviceId
       # get length of data in response
       receivedLen = data[2].hex - 1               # subtract one for service ID
