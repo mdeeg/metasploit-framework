@@ -5,11 +5,11 @@
 
 require 'msf/core'
 require 'rex'
-require 'msf/core/post/hardware/automotive/kwp2000'
+require 'msf/core/post/hardware/automotive/kwp2000_on_can'
 
 class MetasploitModule < Msf::Post
 
-  include Msf::Post::Hardware::Automotive::KWP2000
+  include Msf::Post::Hardware::Automotive::KWP2000onCAN
 
   # parameter IDs (PIDs) for Saab Trionic 7
   VEHICLE_IDENTIFICATION_NUMBER = 0x90
@@ -60,12 +60,26 @@ class MetasploitModule < Msf::Post
   # Read DTC codes
   #
   # @param bus [String] unique CAN bus identifier
-  # @param bus [String] service ID
-  # @param bus [String] parameter ID (PID)
   #
-  # @return [String] engine type
+  # @return [Array] DTC codes
   def read_dtc_codes(bus)
-    response = send_kwp2000_request(bus, 0x240, 0x258, TARGET_TRIONIC, READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS, [], {"MAXPKTS" => 1})
+    response = send_kwp2000_request(bus, 0x240, 0x258, TARGET_TRIONIC, READ_DIAGNOSTIC_TROUBLE_CODES_BY_STATUS, [0x02], {"MAXPKTS" => 1})
+    if response.size > 0
+      response
+    else
+      return nil
+    end
+  end 
+
+
+  #
+  # Clear DTC codes
+  #
+  # @param bus [String] unique CAN bus identifier
+  #
+  # @return response
+  def clear_dtc_codes(bus)
+    response = send_kwp2000_request(bus, 0x240, 0x258, TARGET_TRIONIC, CLEAR_DIAGNOSTIC_INFORMATION, [0xff, 0xff], {"MAXPKTS" => 1})
     if response.size > 0
       response
     else
@@ -107,5 +121,6 @@ class MetasploitModule < Msf::Post
     unless software_version.nil?
       print_good("Software version: #{software_version}")
     end
+
   end
 end
